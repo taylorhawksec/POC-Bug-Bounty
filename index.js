@@ -54,4 +54,3 @@ http.createServer((req, res) => {
   }));
 }).listen(PORT, () => console.log(`PoC server on port ${PORT}`));
 
-🔥 CONFIRMED: payTo matches attacker wallet!
