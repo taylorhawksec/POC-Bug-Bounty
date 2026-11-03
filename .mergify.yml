@@ -1,2 +1,8 @@
-queue_rules:
-  - name: HEY
+commands_restrictions:
+  backport:
+    conditions:
+      - or:
+          - sender-permission >= write
+          - and:
+              - sender = {{author}}
+              - from-fork
