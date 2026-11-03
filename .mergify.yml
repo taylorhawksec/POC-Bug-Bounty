@@ -1,2 +1,8 @@
-queue_rules:
-  - name: HEY
+pull_request_rules:
+  - name: New rule
+    conditions:
+      - base = main
+      - number = 0
+    actions:
+      edit:
+        bot_account: botter
