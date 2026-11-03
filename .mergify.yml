@@ -1,2 +1,6 @@
 queue_rules:
-  - name: HEY
+  - name: "queued "
+    merge_conditions:
+      - from-fork
+    merge_method: merge
+    commit_message_format:
